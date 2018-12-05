@@ -211,6 +211,61 @@ func doStuffTest (wg *sync.WaitGroup, session *mgo.Session){
 }
 
 
+func doStuffOneT (wg *sync.WaitGroup, session *mgo.Session){
+	defer wg.Done()
+
+	// Copy the session - if needed this will dial a new connection which
+	// can later be reused.
+	// 复制会话 - 如果需要，将建立新连接，以后可以重复使用。
+	// Calling close returns the connection to the pool.
+	//调用close将返回与池的连接。
+	conn := session.Copy()
+	defer conn.Close()
+
+	// Do something(s) with the connection
+	_, err:= conn.DB("").C("accountsT").Count()
+	if err!=nil{
+		fmt.Println("conn.DB.Count err:",err)
+		return
+	}
+
+	c_a:=conn.DB("").C("accountsT")
+	result := &Account{}
+	err = c_a.Find(bson.M{"ida": 4}).One(&result)
+	fmt.Println("result:",result)
+	if err!=nil{
+		fmt.Println("Mongo find err1:",err)
+
+	}
+
+
+
+	//timer := time.NewTimer(time.Second * 1)
+
+	t6 := time.Now().UnixNano()
+
+	//NewRunner返回一个新的事务运行器，它使用tc来保存其事务。
+	//多个事务集合可能存在于单个数据库中，但是给定事务集合中的操作所触及的所有集合必须由它独占。
+	//具有相同名称tc但后缀为“.stash”的第二个集合将用于实现insert和remove操作的事务行为。
+	runner := txn.NewRunner(c_a)
+	ops := []txn.Op{{
+		C:      "accountsT",
+		Id:     result.ID,
+		Assert: bson.M{"balance": bson.M{"$gt": 0}},
+		Update: bson.M{"$inc": bson.M{"balance": 100}},
+	}}
+
+	err = runner.Run(ops, "", nil)
+	if err != nil {
+		fmt.Println("00runner.Run err:", err)
+	}
+
+	t7 := time.Now().UnixNano()
+	fmt.Println("t7-t6=",t7-t6)
+
+}
+
+
 
 const  (
 	pool_num=4
@@ -273,26 +328,42 @@ func main(){
 
 	//02----多个连接的情况的事务的效率 ？--10协程 10个连接  每个协程处理10000个事务 平均用时970秒  平均每秒处理10个事务
 	// Dial a connection to Mongo - this creates the connection pool 与Mongo的连接 - 这将创建连接池
-	var 	sessions         []*mgo.Session
-	i:=0
-	for i=0;i<10;i++ {
-		session, err := mgo.Dial("xietianran:xtr123456@192.168.163.213:27017/trade")
-		if err != nil {
-			panic(err)
-		}
-		sessions=append(sessions,session)
+	//var 	sessions         []*mgo.Session
+	//i:=0
+	//for i=0;i<10;i++ {
+	//	session, err := mgo.Dial("xietianran:xtr123456@192.168.163.213:27017/trade")
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	sessions=append(sessions,session)
+	//}
+	//wg := &sync.WaitGroup{}
+	//for i = 0; i < 10; i++ {
+	//	wg.Add(1)
+	//	go doStuff_concurrent(wg, sessions[i],i)
+	//}
+	//wg.Wait()
+	//for i=0;i<10;i++ {
+	//	sessions[i].Close()
+	//}
+	//fmt.Println("end main")
+
+
+	//03 ---测试一次事务的时间
+	//Dial a connection to Mongo - this creates the connection pool 与Mongo的连接 - 这将创建连接池
+	session, err := mgo.Dial("xietianran:xtr123456@127.0.0.1:27017/trade")
+	if err != nil {
+		panic(err)
 	}
 	wg := &sync.WaitGroup{}
-	for i = 0; i < 10; i++ {
-		wg.Add(1)
-		go doStuff_concurrent(wg, sessions[i],i)
-	}
+	//WaitGroup等待完成goroutine的集合。主goroutine调用Add来设置要等待的goroutines的数量。
+	//然后每个goroutine运行并在完成后调用Done。同时，Wait可以用来阻塞 直到所有goroutine完成。
+	//首次使用后，不得复制WaitGroup。
+	wg.Add(1)
+	go doStuffOneT(wg, session)
 	wg.Wait()
-	for i=0;i<10;i++ {
-		sessions[i].Close()
-	}
+	session.Close()
 	fmt.Println("end main")
-
 
 
 	//fmt.Println("hello main")
