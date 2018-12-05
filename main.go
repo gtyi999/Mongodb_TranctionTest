@@ -236,13 +236,13 @@ func main(){
 	// This will be our concurrent worker
 	//这将是我们的并发工作线程
 
-	// Dial a connection to Mongo - this creates the connection pool 与Mongo的连接 - 这将创建连接池
-	//session, err := mgo.Dial("xietianran:xtr123456@192.168.163.213:27017/trade")
-	//if err != nil {
-	//	panic(err)
-	//}
-
 	//0-----协程并发的例子
+	// Dial a connection to Mongo - this creates the connection pool 与Mongo的连接 - 这将创建连接池
+	session, err := mgo.Dial("xietianran:xtr123456@127.0.0.1:27017/trade")
+	if err != nil {
+		panic(err)
+	}
+
 	// Concurrently do things, passing the session to the worker
 	//wg := &sync.WaitGroup{}
 	//for i := 0; i < 10; i++ {
@@ -255,38 +255,38 @@ func main(){
 
 
 	//01--测试一秒能执行多少次事务？  一个连接  一秒做20次事务（upadte 和insert) 左右     10万次用时 489秒
-	//wg := &sync.WaitGroup{}
+	wg := &sync.WaitGroup{}
 	//WaitGroup等待完成goroutine的集合。主goroutine调用Add来设置要等待的goroutines的数量。
-	// 然后每个goroutine运行并在完成后调用Done。同时，Wait可以用来阻塞 直到所有goroutine完成。
+	//然后每个goroutine运行并在完成后调用Done。同时，Wait可以用来阻塞 直到所有goroutine完成。
 	//首次使用后，不得复制WaitGroup。
-	//wg.Add(1)
-	//go doStuffTest(wg, session)
-	//wg.Wait()
-	//session.Close()
-	//fmt.Println("end main")
+	wg.Add(1)
+	go doStuffTest(wg, session)
+	wg.Wait()
+	session.Close()
+	fmt.Println("end main")
 
 
 	//02----多个连接的情况的事务的效率 ？--10协程 10个连接  每个协程处理10000个事务 平均用时970秒  平均每秒处理10个事务
 	// Dial a connection to Mongo - this creates the connection pool 与Mongo的连接 - 这将创建连接池
-	var 	sessions         []*mgo.Session
-	i:=0
-	for i=0;i<10;i++ {
-		session, err := mgo.Dial("xietianran:xtr123456@192.168.163.213:27017/trade")
-		if err != nil {
-			panic(err)
-		}
-		sessions=append(sessions,session)
-	}
-	wg := &sync.WaitGroup{}
-	for i = 0; i < 10; i++ {
-		wg.Add(1)
-		go doStuff_concurrent(wg, sessions[i],i)
-	}
-	wg.Wait()
-	for i=0;i<10;i++ {
-		sessions[i].Close()
-	}
-	fmt.Println("end main")
+	//var 	sessions         []*mgo.Session
+	//i:=0
+	//for i=0;i<10;i++ {
+	//	session, err := mgo.Dial("xietianran:xtr123456@192.168.163.213:27017/trade")
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	sessions=append(sessions,session)
+	//}
+	//wg := &sync.WaitGroup{}
+	//for i = 0; i < 10; i++ {
+	//	wg.Add(1)
+	//	go doStuff_concurrent(wg, sessions[i],i)
+	//}
+	//wg.Wait()
+	//for i=0;i<10;i++ {
+	//	sessions[i].Close()
+	//}
+	//fmt.Println("end main")
 
 
 
